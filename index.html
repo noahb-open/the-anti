@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Real-Time Chat</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; background: #f4f4f9; }
+        .hidden { display: none; }
+        #chat-box { border: 1px solid #ccc; height: 250px; overflow-y: scroll; padding: 10px; background: white; margin-bottom: 10px; }
+        input, button { padding: 8px; margin: 5px 0; }
+    </style>
+    <script src="https://socket.io"></script>
+</head>
+<body>
+    <!-- LOGIN/SIGNUP PANEL -->
+    <div id="auth-section">
+        <h2>Sign Up / Log In</h2>
+        <input type="text" id="username" placeholder="Username"><br>
+        <input type="password" id="password" placeholder="Password"><br>
+        <button onclick="register()">Sign Up</button>
+        <button onclick="login()">Log In</button>
+    </div>
+
+    <!-- CHAT INTERFACE -->
+    <div id="chat-section" class="hidden">
+        <h2>Hello, <span id="user-display"></span>!</h2>
+        <p>Your ID is: <b id="my-id-display"></b> (Give this to your friends)</p>
+        
+        <input type="number" id="friend-id" placeholder="Friend's User ID"><br>
+        <div id="chat-box"></div>
+        <input type="text" id="message-text" placeholder="Type a message..." style="width: 250px;">
+        <button onclick="sendMessage()">Send</button>
+    </div>
+
+    <script>
+        const SERVER_URL = window.location.origin;
+        let socket, currentUser = null;
+
+        async function register() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const res = await fetch(`${SERVER_URL}/register`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            if (res.ok) alert("Account created! Now click Log In.");
+            else alert("Error signing up.");
+        }
+
+        async function login() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const res = await fetch(`${SERVER_URL}/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                currentUser = data.user;
+                document.getElementById('auth-section').classList.add('hidden');
+                document.getElementById('chat-section').classList.remove('hidden');
+                document.getElementById('user-display').innerText = currentUser.username;
+                document.getElementById('my-id-display').innerText = currentUser.id;
+                initSocket();
+            } else {
+                alert(data.error);
+            }
+        }
+
+        function initSocket() {
+            socket = io(SERVER_URL);
+            socket.emit('join', currentUser.id);
+            socket.on('new_message', (data) => {
+                const box = document.getElementById('chat-box');
+                box.innerHTML += `<p><b>Friend (ID ${data.senderId}):</b> ${data.messageText}</p>`;
+                box.scrollTop = box.scrollHeight;
+            });
+        }
+
+        function sendMessage() {
+            const friendId = parseInt(document.getElementById('friend-id').value);
+            const messageText = document.getElementById('message-text').value;
+            socket.emit('private_message', { senderId: currentUser.id, receiverId: friendId, messageText });
+            
+            const box = document.getElementById('chat-box');
+            box.innerHTML += `<p style="color: blue;"><b>You:</b> ${messageText}</p>`;
+            box.scrollTop = box.scrollHeight;
+            document.getElementById('message-text').value = '';
+        }
+    </script>
+</body>
+</html>
+
